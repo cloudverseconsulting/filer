@@ -14,6 +14,7 @@ import { useEffect, useState } from "react"
 import "../style.css"
 
 import { applyTheme } from "../assets/themes"
+import { I18nProvider } from "../contexts/I18nContext"
 import {
   loadActivity,
   loadSettings,
@@ -69,6 +70,7 @@ function IndexPopup() {
   const isEnabled = settings?.extension_enabled ?? true
 
   return (
+    <I18nProvider lang={settings?.language ?? "en"}>
     <div
       style={{ width: 320, minHeight: 480 }}
       className="bg-bg-primary text-text-primary flex flex-col">
@@ -95,6 +97,7 @@ function IndexPopup() {
 
       <Footer onOpenSettings={openSettings} />
     </div>
+    </I18nProvider>
   )
 }
 

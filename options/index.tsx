@@ -8,6 +8,8 @@ import {
   Palette
 } from "lucide-react"
 import { useEffect, useState } from "react"
+import { I18nProvider, useT } from "../contexts/I18nContext"
+import { LANGUAGES } from "../lib/i18n"
 
 import "../style.css"
 
@@ -140,6 +142,7 @@ export default function OptionsPage() {
   const customRules = rules.filter((r) => r.is_custom)
 
   return (
+    <I18nProvider lang={settings.language ?? "en"}>
     <div className="bg-bg-primary text-text-primary min-h-screen flex">
       <Sidebar tab={tab} onTabChange={setTab} settings={settings} />
 
@@ -208,6 +211,7 @@ export default function OptionsPage() {
         <UpgradeModal onClose={() => setShowUpgrade(false)} />
       )}
     </div>
+    </I18nProvider>
   )
 }
 
@@ -215,14 +219,19 @@ export default function OptionsPage() {
 // Sidebar
 // ──────────────────────────────────────────────
 
-const NAV: { key: Tab; label: string; Icon: React.ElementType }[] = [
-  { key: "packs", label: "My Packs", Icon: BookOpen },
-  { key: "templates", label: "Templates", Icon: Library },
-  { key: "rules", label: "My Rules", Icon: List },
-  { key: "activity", label: "Activity Log", Icon: Activity },
-  { key: "appearance", label: "Appearance", Icon: Palette },
-  { key: "account", label: "Account", Icon: CreditCard }
+const NAV_KEYS: { key: Tab; tKey: string; Icon: React.ElementType }[] = [
+  { key: "packs",      tKey: "nav.my_packs",   Icon: BookOpen },
+  { key: "templates",  tKey: "nav.templates",   Icon: Library },
+  { key: "rules",      tKey: "nav.my_rules",    Icon: List },
+  { key: "activity",   tKey: "nav.activity",    Icon: Activity },
+  { key: "appearance", tKey: "nav.appearance",  Icon: Palette },
+  { key: "account",    tKey: "nav.account",     Icon: CreditCard }
 ]
+
+function NavLabel({ tKey }: { tKey: string }) {
+  const { t } = useT()
+  return <>{t(tKey)}</>
+}
 
 function Sidebar({
   tab,
@@ -244,7 +253,7 @@ function Sidebar({
       </div>
 
       <nav className="flex flex-col gap-1">
-        {NAV.map(({ key, label, Icon }) => (
+        {NAV_KEYS.map(({ key, tKey, Icon }) => (
           <button
             key={key}
             onClick={() => onTabChange(key)}
@@ -254,7 +263,7 @@ function Sidebar({
                 : "text-text-secondary hover:bg-bg-card hover:text-text-primary"
             }`}>
             <Icon size={16} />
-            {label}
+            <NavLabel tKey={tKey} />
           </button>
         ))}
       </nav>
@@ -502,6 +511,31 @@ function AppearanceTab({
               onChange={(v) => onUpdate({ enable_log: v })}
               label="Toggle activity log"
             />
+          </div>
+        </div>
+
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-text-primary">
+            Language
+          </h2>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {LANGUAGES.map((lang) => (
+              <button
+                key={lang.code}
+                onClick={() => onUpdate({ language: lang.code })}
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all ${
+                  settings.language === lang.code
+                    ? "border-accent bg-accent/10"
+                    : "border-border bg-bg-card hover:bg-bg-secondary"
+                }`}
+              >
+                <span className="text-lg">{lang.flag}</span>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-semibold text-text-primary truncate">{lang.native}</span>
+                  <span className="text-[10px] text-text-secondary truncate">{lang.name}</span>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       </div>

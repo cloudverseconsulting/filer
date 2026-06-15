@@ -170,6 +170,7 @@ export interface UserSettings {
   enable_log: boolean
   extension_enabled: boolean
   is_paid: boolean
+  language: string
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -180,5 +181,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
   date_format: "YYYY-MM-DD",
   enable_log: true,
   extension_enabled: true,
-  is_paid: false
+  is_paid: false,
+  language: "en"
 }
