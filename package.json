@@ -1,0 +1,38 @@
+{
+  "name": "filer",
+  "displayName": "Filer — Smart Download Organizer",
+  "version": "1.0.0",
+  "description": "Automatically renames and organizes every file you download. No more document(3).pdf.",
+  "author": "Anubhav",
+  "homepage": "https://filer.app",
+  "scripts": {
+    "dev": "plasmo dev",
+    "build": "plasmo build",
+    "package": "plasmo package",
+    "typecheck": "tsc --noEmit",
+    "test": "npx tsx tests/naming.test.ts"
+  },
+  "dependencies": {
+    "lucide-react": "^0.460.0",
+    "plasmo": "0.90.5",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/chrome": "0.0.287",
+    "@types/node": "20.11.5",
+    "@types/react": "18.2.48",
+    "@types/react-dom": "18.2.18",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "prettier": "3.2.4",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "5.3.3"
+  },
+  "manifest": {
+    "permissions": ["downloads", "tabs", "storage"],
+    "host_permissions": ["<all_urls>"]
+  }
+}
