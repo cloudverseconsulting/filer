@@ -14,7 +14,7 @@ import { useEffect, useState } from "react"
 import "../style.css"
 
 import { applyTheme } from "../assets/themes"
-import { I18nProvider } from "../contexts/I18nContext"
+import { I18nProvider, useT } from "../contexts/I18nContext"
 import {
   loadActivity,
   loadSettings,
@@ -81,9 +81,7 @@ function IndexPopup() {
       <StatsBar today={todayCount} week={weekCount} />
 
       <div className="flex-1 overflow-y-auto px-4 py-3">
-        <div className="text-text-secondary mb-2 text-xs font-medium uppercase tracking-wider">
-          Recent
-        </div>
+        <PopupRecentLabel />
         {activity.length === 0 ? (
           <EmptyState />
         ) : (
@@ -132,12 +130,22 @@ function Header({
   )
 }
 
+function PopupRecentLabel() {
+  const { t } = useT()
+  return (
+    <div className="text-text-secondary mb-2 text-xs font-medium uppercase tracking-wider">
+      {t("popup.recent")}
+    </div>
+  )
+}
+
 function StatsBar({ today, week }: { today: number; week: number }) {
+  const { t } = useT()
   return (
     <div className="border-border grid grid-cols-2 border-b">
-      <StatCell value={today} label="Today" />
+      <StatCell value={today} label={t("popup.today")} />
       <div className="border-border border-l">
-        <StatCell value={week} label="This week" />
+        <StatCell value={week} label={t("popup.week")} />
       </div>
     </div>
   )
@@ -209,33 +217,33 @@ function MethodBadge({ method }: { method: ActivityEntry["naming_method"] }) {
 }
 
 function PausedBanner() {
+  const { t } = useT()
   return (
     <div className="mx-3 mt-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-center text-xs text-warning">
-      Filer is paused — toggle the switch above to resume.
+      {t("popup.paused")} — {t("popup.paused.sub")}
     </div>
   )
 }
 
 function EmptyState() {
+  const { t } = useT()
   return (
     <div className="text-text-secondary flex flex-col items-center justify-center px-2 py-10 text-center">
       <Folder size={32} className="mb-2 opacity-50" />
-      <div className="text-sm">No downloads yet.</div>
-      <div className="mt-1 text-xs">
-        Download a file and it'll show up here.
-      </div>
+      <div className="text-sm">{t("popup.no_activity")}</div>
     </div>
   )
 }
 
 function Footer({ onOpenSettings }: { onOpenSettings: () => void }) {
+  const { t } = useT()
   return (
     <div className="border-border border-t p-3">
       <button
         onClick={onOpenSettings}
         className="bg-bg-card hover:bg-bg-secondary border-border flex w-full items-center justify-center gap-2 rounded-md border py-2 text-sm font-medium transition-colors">
         <SettingsIcon size={14} />
-        Open Settings
+        {t("popup.settings")}
       </button>
       <div className="text-text-secondary mt-2 text-center text-[10px]">
         v{VERSION}

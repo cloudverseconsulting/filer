@@ -321,22 +321,23 @@ function PacksTab({
   onToggle: (p: PersonaPack) => void
   onUpgrade: () => void
 }) {
+  const { t } = useT()
   const active = settings.active_packs
 
   return (
     <div>
       <SectionHeader
-        title="My Packs"
-        subtitle={`${active.length} pack${active.length !== 1 ? "s" : ""} installed`}
+        title={t("packs.title")}
+        subtitle={active.length === 1
+          ? t("packs.installed", { n: active.length })
+          : t("packs.installed_pl", { n: active.length })}
       />
 
       {active.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-16 text-center">
           <span className="text-4xl">📦</span>
-          <p className="text-sm font-medium text-text-primary">No packs installed yet</p>
-          <p className="text-xs text-text-secondary">
-            Browse the Templates tab to find packs for your workflow.
-          </p>
+          <p className="text-sm font-medium text-text-primary">{t("packs.empty.title")}</p>
+          <p className="text-xs text-text-secondary">{t("packs.empty.body")}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -377,6 +378,7 @@ function RulesTab({
   onDelete: (id: string) => void
   onUpgrade: () => void
 }) {
+  const { t } = useT()
   const [editing, setEditing] = useState<Rule | null | "new">(null)
 
   function handleAdd() {
@@ -390,8 +392,10 @@ function RulesTab({
   return (
     <div>
       <SectionHeader
-        title="My Rules"
-        subtitle={`${rules.length} rule${rules.length !== 1 ? "s" : ""} — sorted by priority`}
+        title={t("rules.title")}
+        subtitle={rules.length === 1
+          ? t("rules.subtitle", { n: rules.length })
+          : t("rules.subtitle_pl", { n: rules.length })}
       />
       <RuleList
         rules={rules}
@@ -430,115 +434,139 @@ function AppearanceTab({
   settings: UserSettings
   onUpdate: (patch: Partial<UserSettings>) => Promise<void>
 }) {
+  const { t } = useT()
+  const [pendingLang, setPendingLang] = useState<string | null>(null)
+
+  const currentLang = LANGUAGES.find((l) => l.code === settings.language) ?? LANGUAGES[0]
+  const pendingLangMeta = LANGUAGES.find((l) => l.code === pendingLang)
+
   const sampleFilename = (fmt: DateFormat) => {
     const d = new Date()
     const Y = d.getFullYear()
     const M = String(d.getMonth() + 1).padStart(2, "0")
     const D = String(d.getDate()).padStart(2, "0")
-    const date = fmt
-      .replace("YYYY", String(Y))
-      .replace("MM", M)
-      .replace("DD", D)
+    const date = fmt.replace("YYYY", String(Y)).replace("MM", M).replace("DD", D)
     return `Q2_Revenue_Report_${date}.pdf`
   }
 
   return (
     <div>
-      <SectionHeader title="Appearance" />
+      <SectionHeader title={t("appear.title")} />
 
       <div className="flex flex-col gap-8">
         <div>
-          <h2 className="mb-3 text-sm font-semibold text-text-primary">
-            Theme
-          </h2>
-          <ThemeSwitcher
-            current={settings.theme}
-            onChange={(t) => onUpdate({ theme: t })}
-          />
+          <h2 className="mb-3 text-sm font-semibold text-text-primary">{t("appear.theme")}</h2>
+          <ThemeSwitcher current={settings.theme} onChange={(th) => onUpdate({ theme: th })} />
         </div>
 
         <div>
-          <h2 className="mb-3 text-sm font-semibold text-text-primary">
-            Date format
-          </h2>
+          <h2 className="mb-3 text-sm font-semibold text-text-primary">{t("appear.date_format")}</h2>
           <div className="flex flex-col gap-2">
-            {(["YYYY-MM-DD", "DD-MM-YYYY", "MM-DD-YYYY"] as DateFormat[]).map(
-              (fmt) => (
-                <label
-                  key={fmt}
-                  className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
-                    settings.date_format === fmt
-                      ? "border-accent bg-accent/10"
-                      : "border-border bg-bg-card hover:bg-bg-secondary"
-                  }`}>
-                  <input
-                    type="radio"
-                    name="date_format"
-                    value={fmt}
-                    checked={settings.date_format === fmt}
-                    onChange={() => onUpdate({ date_format: fmt })}
-                    className="accent-accent"
-                  />
-                  <span className="font-mono text-sm text-text-primary">
-                    {fmt}
-                  </span>
-                </label>
-              )
-            )}
+            {(["YYYY-MM-DD", "DD-MM-YYYY", "MM-DD-YYYY"] as DateFormat[]).map((fmt) => (
+              <label
+                key={fmt}
+                className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
+                  settings.date_format === fmt
+                    ? "border-accent bg-accent/10"
+                    : "border-border bg-bg-card hover:bg-bg-secondary"
+                }`}>
+                <input
+                  type="radio"
+                  name="date_format"
+                  value={fmt}
+                  checked={settings.date_format === fmt}
+                  onChange={() => onUpdate({ date_format: fmt })}
+                  className="accent-accent"
+                />
+                <span className="font-mono text-sm text-text-primary">{fmt}</span>
+              </label>
+            ))}
           </div>
-
           <div className="mt-3 rounded-lg bg-bg-secondary px-4 py-3 text-sm">
-            <span className="text-text-secondary">Preview: </span>
-            <span className="font-mono text-text-primary">
-              {sampleFilename(settings.date_format)}
-            </span>
+            <span className="text-text-secondary">{t("appear.preview")}: </span>
+            <span className="font-mono text-text-primary">{sampleFilename(settings.date_format)}</span>
           </div>
         </div>
 
         <div>
-          <h2 className="mb-3 text-sm font-semibold text-text-primary">
-            Activity logging
-          </h2>
+          <h2 className="mb-3 text-sm font-semibold text-text-primary">{t("appear.logging")}</h2>
           <div className="flex items-center justify-between rounded-lg border border-border bg-bg-card px-4 py-3">
             <div>
-              <p className="text-sm text-text-primary">Log all downloads</p>
-              <p className="text-xs text-text-secondary">
-                Stored locally on your device
-              </p>
+              <p className="text-sm text-text-primary">{t("appear.logging.body")}</p>
+              <p className="text-xs text-text-secondary">{t("appear.logging.subtitle")}</p>
             </div>
             <Toggle
               checked={settings.enable_log}
               onChange={(v) => onUpdate({ enable_log: v })}
-              label="Toggle activity log"
+              label={t("appear.logging")}
             />
           </div>
         </div>
 
+        {/* Language — compact picklist */}
         <div>
-          <h2 className="mb-3 text-sm font-semibold text-text-primary">
-            Language
-          </h2>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {LANGUAGES.map((lang) => (
-              <button
-                key={lang.code}
-                onClick={() => onUpdate({ language: lang.code })}
-                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all ${
-                  settings.language === lang.code
-                    ? "border-accent bg-accent/10"
-                    : "border-border bg-bg-card hover:bg-bg-secondary"
-                }`}
-              >
-                <span className="text-lg">{lang.flag}</span>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-semibold text-text-primary truncate">{lang.native}</span>
-                  <span className="text-[10px] text-text-secondary truncate">{lang.name}</span>
-                </div>
-              </button>
-            ))}
+          <h2 className="mb-3 text-sm font-semibold text-text-primary">{t("appear.language")}</h2>
+          <div className="flex items-center gap-3 rounded-lg border border-border bg-bg-card px-4 py-3">
+            <span className="text-xl">{currentLang.flag}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-text-primary">{currentLang.native}</p>
+              <p className="text-xs text-text-secondary">{currentLang.name}</p>
+            </div>
+            <select
+              value={settings.language}
+              onChange={(e) => setPendingLang(e.target.value)}
+              className="rounded-lg border border-border bg-bg-secondary px-3 py-1.5 text-sm text-text-primary outline-none cursor-pointer"
+              style={{ minWidth: 160 }}
+            >
+              {LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.flag} {lang.native} ({lang.name})
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
+
+      {/* Language confirmation modal */}
+      {pendingLang && pendingLangMeta && (
+        <Modal
+          title={t("appear.language")}
+          onClose={() => setPendingLang(null)}
+        >
+          <div className="p-6 flex flex-col gap-5">
+            <div className="flex items-center gap-4 rounded-xl border border-border bg-bg-secondary p-4">
+              <span className="text-4xl">{pendingLangMeta.flag}</span>
+              <div>
+                <p className="text-base font-semibold text-text-primary">{pendingLangMeta.native}</p>
+                <p className="text-xs text-text-secondary">{pendingLangMeta.name}</p>
+              </div>
+            </div>
+            <p className="text-sm text-text-secondary">
+              Switch the interface to <strong className="text-text-primary">{pendingLangMeta.native}</strong>?
+              The page will update immediately.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                className="flex-1"
+                onClick={async () => {
+                  await onUpdate({ language: pendingLang })
+                  setPendingLang(null)
+                }}
+              >
+                Apply
+              </Button>
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => setPendingLang(null)}
+              >
+                {t("common.cancel")}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
@@ -558,37 +586,31 @@ function AccountTab({
   customCount: number
   onUpgrade: () => void
 }) {
+  const { t } = useT()
+
   if (settings.is_paid) {
     return (
       <div>
-        <SectionHeader title="Account" />
+        <SectionHeader title={t("acct.title")} />
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4">
             <span className="text-2xl">⭐</span>
             <div>
-              <p className="font-semibold text-text-primary">Filer Pro</p>
-              <p className="text-xs text-text-secondary">
-                Unlimited packs, rules, and history.
-              </p>
+              <p className="font-semibold text-text-primary">{t("acct.plan.pro")}</p>
+              <p className="text-xs text-text-secondary">{t("acct.pro.subtitle")}</p>
             </div>
-            <Badge color="warning" className="ml-auto">
-              Pro
-            </Badge>
+            <Badge color="warning" className="ml-auto">Pro</Badge>
           </div>
-
           <div className="rounded-xl border border-border bg-bg-card p-4">
             <div className="flex flex-col gap-2 text-sm">
-              <Row label="Plan" value="Pro" />
-              <Row label="Active rules" value={String(rulesCount)} />
-              <Row label="Sync" value="Enabled across devices" />
+              <Row label={t("acct.plan_label")} value="Pro" />
+              <Row label={t("acct.active_rules")} value={String(rulesCount)} />
+              <Row label={t("acct.sync")} value={t("acct.sync.pro")} />
             </div>
           </div>
-
-          <Button
-            variant="secondary"
-            size="sm"
+          <Button variant="secondary" size="sm"
             onClick={() => window.open("https://filer.app/billing", "_blank")}>
-            Manage subscription →
+            {t("acct.manage")}
           </Button>
         </div>
       </div>
@@ -597,60 +619,43 @@ function AccountTab({
 
   return (
     <div>
-      <SectionHeader title="Account" />
+      <SectionHeader title={t("acct.title")} />
       <div className="flex flex-col gap-4">
         <div className="rounded-xl border border-border bg-bg-card p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-text-secondary mb-3">
-            Current plan: Free
+            {t("acct.plan.free")}
           </p>
           <div className="flex flex-col gap-2 text-sm">
-            <Row
-              label="Custom rules"
+            <Row label={t("acct.custom_rules")}
               value={`${customCount}/${MAX_FREE_CUSTOM} used`}
-              warn={customCount >= MAX_FREE_CUSTOM}
-            />
-            <Row
-              label="Active packs"
+              warn={customCount >= MAX_FREE_CUSTOM} />
+            <Row label={t("acct.active_packs")}
               value={`${settings.active_packs.length}/${MAX_FREE_PACKS} used`}
-              warn={settings.active_packs.length >= MAX_FREE_PACKS}
-            />
-            <Row label="History" value="30 days" />
-            <Row label="Sync" value="Local only" />
+              warn={settings.active_packs.length >= MAX_FREE_PACKS} />
+            <Row label={t("acct.history")} value={t("acct.history.free")} />
+            <Row label={t("acct.sync")} value={t("acct.sync.free")} />
           </div>
         </div>
 
-        {/* Upgrade CTA */}
         <div className="rounded-xl border border-accent/30 bg-accent/5 p-5">
           <p className="text-base font-semibold text-text-primary mb-3">
-            Upgrade to Pro
+            {t("acct.upgrade.title")}
           </p>
           <div className="flex flex-col gap-2 mb-4">
-            {[
-              "Unlimited packs & custom rules",
-              "Drag-and-drop rule priority",
-              "Unlimited activity history",
-              "Export log to CSV",
-              "Sync rules across devices"
-            ].map((feat) => (
-              <div key={feat} className="flex items-center gap-2 text-sm text-text-secondary">
+            {(["acct.feat.1","acct.feat.2","acct.feat.3","acct.feat.4","acct.feat.5"] as const).map((key) => (
+              <div key={key} className="flex items-center gap-2 text-sm text-text-secondary">
                 <CheckCircle size={14} className="text-success flex-shrink-0" />
-                {feat}
+                {t(key)}
               </div>
             ))}
           </div>
           <div className="flex items-baseline gap-2 mb-4">
             <span className="text-2xl font-bold text-text-primary">$5</span>
             <span className="text-text-secondary text-sm">/month</span>
-            <span className="text-text-secondary text-xs ml-2">
-              or $39/year
-            </span>
+            <span className="text-text-secondary text-xs ml-2">or $39/year</span>
           </div>
-          <Button onClick={onUpgrade} className="w-full">
-            Start 7-day free trial
-          </Button>
-          <p className="mt-2 text-center text-xs text-text-secondary">
-            No card required during trial.
-          </p>
+          <Button onClick={onUpgrade} className="w-full">{t("acct.upgrade.cta")}</Button>
+          <p className="mt-2 text-center text-xs text-text-secondary">{t("acct.trial_note")}</p>
         </div>
       </div>
     </div>
@@ -684,20 +689,15 @@ function Row({
 // ──────────────────────────────────────────────
 
 function UpgradeModal({ onClose }: { onClose: () => void }) {
+  const { t } = useT()
   return (
-    <Modal onClose={onClose} title="Upgrade to Pro">
+    <Modal onClose={onClose} title={t("acct.upgrade.title")}>
       <div className="p-6 flex flex-col gap-5">
         <div className="flex flex-col gap-2.5">
-          {[
-            "Unlimited packs & custom rules",
-            "Drag-and-drop rule priority reordering",
-            "Unlimited activity history (never expires)",
-            "Export activity log to CSV",
-            "Sync rules across all your devices"
-          ].map((feat) => (
-            <div key={feat} className="flex items-center gap-2.5 text-sm text-text-secondary">
+          {(["acct.feat.1","acct.feat.2","acct.feat.3","acct.feat.4","acct.feat.5"] as const).map((key) => (
+            <div key={key} className="flex items-center gap-2.5 text-sm text-text-secondary">
               <CheckCircle size={15} className="text-success flex-shrink-0" />
-              {feat}
+              {t(key)}
             </div>
           ))}
         </div>
@@ -711,15 +711,13 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="flex flex-col gap-2">
-          <Button
-            className="w-full"
+          <Button className="w-full"
             onClick={() => window.open("https://filer.app/upgrade", "_blank")}>
-            Start 7-day free trial
+            {t("acct.upgrade.cta")}
           </Button>
-          <button
-            onClick={onClose}
+          <button onClick={onClose}
             className="text-xs text-text-secondary hover:text-text-primary transition-colors text-center py-1">
-            Maybe later
+            {t("common.cancel")}
           </button>
         </div>
       </div>
