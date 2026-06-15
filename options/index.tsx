@@ -312,43 +312,37 @@ function PacksTab({
   onToggle: (p: PersonaPack) => void
   onUpgrade: () => void
 }) {
-  const all = Object.keys(PACKS) as PersonaPack[]
+  const active = settings.active_packs
 
   return (
     <div>
       <SectionHeader
         title="My Packs"
-        subtitle="Pre-built rule collections for common download patterns."
+        subtitle={`${active.length} pack${active.length !== 1 ? "s" : ""} installed`}
       />
-      {!settings.is_paid && (
-        <div className="mb-5 flex items-center justify-between rounded-lg border border-warning/40 bg-warning/10 px-4 py-3">
-          <p className="text-xs text-warning">
-            Free plan: up to {MAX_FREE_PACKS} active packs.{" "}
-            {settings.active_packs.length}/{MAX_FREE_PACKS} used.
+
+      {active.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-16 text-center">
+          <span className="text-4xl">📦</span>
+          <p className="text-sm font-medium text-text-primary">No packs installed yet</p>
+          <p className="text-xs text-text-secondary">
+            Browse the Templates tab to find packs for your workflow.
           </p>
-          <button
-            onClick={onUpgrade}
-            className="text-xs font-medium text-accent hover:underline">
-            Upgrade →
-          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {active.map((pack) => (
+            <PackCard
+              key={pack}
+              pack={pack}
+              active
+              onToggle={onToggle}
+              locked={false}
+              onLockedClick={onUpgrade}
+            />
+          ))}
         </div>
       )}
-      <div className="flex flex-col gap-3">
-        {all.map((pack) => (
-          <PackCard
-            key={pack}
-            pack={pack}
-            active={settings.active_packs.includes(pack)}
-            onToggle={onToggle}
-            locked={
-              !settings.is_paid &&
-              !settings.active_packs.includes(pack) &&
-              settings.active_packs.length >= MAX_FREE_PACKS
-            }
-            onLockedClick={onUpgrade}
-          />
-        ))}
-      </div>
     </div>
   )
 }
