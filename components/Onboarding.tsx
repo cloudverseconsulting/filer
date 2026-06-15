@@ -1,9 +1,9 @@
 import { ArrowRight, Folder, Shield, Sparkles, Zap } from "lucide-react"
 import { useEffect, useState } from "react"
 import { applyTheme, THEMES } from "../assets/themes"
-import { PACKS } from "../lib/packs"
+import { PACK_CATEGORIES, PACKS } from "../lib/packs"
 import { saveSettings } from "../lib/storage"
-import type { PersonaPack, Theme } from "../types"
+import type { PackCategory, PersonaPack, Theme } from "../types"
 import { ThemeSwitcher } from "./ThemeSwitcher"
 import { Button } from "./ui"
 
@@ -11,7 +11,13 @@ interface Props {
   onComplete: () => void
 }
 
-const ALL_PACKS = Object.keys(PACKS) as PersonaPack[]
+const FEATURED_PACKS: PersonaPack[] = [
+  "consultant", "developer", "student", "finance", "researcher"
+]
+
+const CATEGORY_ORDER: PackCategory[] = [
+  "professional", "personal", "industry", "hobby", "meta"
+]
 
 export function Onboarding({ onComplete }: Props) {
   const [screen, setScreen] = useState(0)
@@ -146,14 +152,6 @@ function PersonaScreen({
   onToggle: (p: PersonaPack) => void
   onNext: () => void
 }) {
-  const packExamples: Record<PersonaPack, string[]> = {
-    consultant: ["Invoice Detection", "Contract Detection", "Salesforce Export"],
-    student: ["Lecture Slides", "Assignment Files", "Research Papers"],
-    finance: ["Payment Receipts", "Bank Statements", "Tax Documents"],
-    shopper: ["Order Confirmations", "Return Labels", "Receipts"],
-    professional: ["Presentations", "Spreadsheets", "Archives"]
-  }
-
   return (
     <div className="flex max-w-2xl flex-col gap-6 w-full">
       <div className="text-center">
@@ -165,41 +163,37 @@ function PersonaScreen({
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {ALL_PACKS.map((pack) => {
-          const def = PACKS[pack]
-          const active = selected.includes(pack)
-          return (
-            <button
-              key={pack}
-              onClick={() => onToggle(pack)}
-              className={`relative flex flex-col gap-2 rounded-xl border p-4 text-left transition-all ${
-                active
-                  ? "border-accent bg-accent/10 shadow-lg"
-                  : "border-border bg-bg-card hover:bg-bg-secondary"
-              }`}>
-              {active && (
-                <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] text-white">
-                  ✓
-                </span>
-              )}
-              <span className="text-2xl">{def.emoji}</span>
-              <span className="text-sm font-semibold text-text-primary">
-                {def.label}
-              </span>
-              <div className="flex flex-col gap-0.5">
-                {packExamples[pack].map((ex) => (
-                  <span key={ex} className="text-[11px] text-text-secondary">
-                    · {ex}
-                  </span>
-                ))}
-              </div>
-            </button>
-          )
-        })}
+      {/* Featured */}
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-text-secondary">
+          ⭐ Popular picks
+        </p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {FEATURED_PACKS.map((pack) => (
+            <PackButton key={pack} pack={pack} active={selected.includes(pack)} onToggle={onToggle} featured />
+          ))}
+        </div>
       </div>
 
-      <div className="flex justify-center">
+      {/* By category */}
+      {CATEGORY_ORDER.map((cat) => {
+        const catMeta = PACK_CATEGORIES[cat]
+        const catPacks = catMeta.packs.filter((p) => !FEATURED_PACKS.includes(p))
+        return (
+          <div key={cat}>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-text-secondary">
+              {catMeta.emoji} {catMeta.label}
+            </p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {catPacks.map((pack) => (
+                <PackButton key={pack} pack={pack} active={selected.includes(pack)} onToggle={onToggle} />
+              ))}
+            </div>
+          </div>
+        )
+      })}
+
+      <div className="flex justify-center pt-2">
         <Button
           onClick={onNext}
           disabled={selected.length === 0}
@@ -208,6 +202,42 @@ function PersonaScreen({
         </Button>
       </div>
     </div>
+  )
+}
+
+function PackButton({
+  pack,
+  active,
+  onToggle,
+  featured
+}: {
+  pack: PersonaPack
+  active: boolean
+  onToggle: (p: PersonaPack) => void
+  featured?: boolean
+}) {
+  const def = PACKS[pack]
+  return (
+    <button
+      onClick={() => onToggle(pack)}
+      className={`relative flex flex-col gap-1.5 rounded-xl border p-3 text-left transition-all ${
+        active
+          ? "border-accent bg-accent/10 shadow-lg"
+          : "border-border bg-bg-card hover:bg-bg-secondary"
+      }`}>
+      {active && (
+        <span className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[9px] text-white">
+          ✓
+        </span>
+      )}
+      <span className={featured ? "text-xl" : "text-xl"}>{def.emoji}</span>
+      <span className="text-xs font-semibold text-text-primary leading-tight">
+        {def.label}
+      </span>
+      <span className="text-[10px] text-text-secondary leading-snug line-clamp-2">
+        {def.description}
+      </span>
+    </button>
   )
 }
 

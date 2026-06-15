@@ -3,6 +3,7 @@ import {
   BookOpen,
   CheckCircle,
   CreditCard,
+  Library,
   List,
   Palette
 } from "lucide-react"
@@ -14,6 +15,7 @@ import { applyTheme } from "../assets/themes"
 import { ActivityLog } from "../components/ActivityLog"
 import { Onboarding } from "../components/Onboarding"
 import { PackCard } from "../components/PackCard"
+import { PackLibrary } from "../components/PackLibrary"
 import { RuleBuilder } from "../components/RuleBuilder"
 import { RuleList } from "../components/RuleList"
 import { ThemeSwitcher } from "../components/ThemeSwitcher"
@@ -36,7 +38,7 @@ import type {
   UserSettings
 } from "../types"
 
-type Tab = "packs" | "rules" | "activity" | "appearance" | "account"
+type Tab = "packs" | "templates" | "rules" | "activity" | "appearance" | "account"
 
 const MAX_FREE_PACKS = 3
 const MAX_FREE_CUSTOM = 5
@@ -149,6 +151,22 @@ export default function OptionsPage() {
             onUpgrade={() => setShowUpgrade(true)}
           />
         )}
+        {tab === "templates" && (
+          <PackLibrary
+            settings={settings}
+            onSettingsChange={async (patch) => {
+              await updateSettings(patch)
+              if (patch.active_packs) {
+                const packRules = getRulesForPacks(patch.active_packs)
+                const custom = rules.filter((r) => r.is_custom)
+                const newRules = [...packRules, ...custom]
+                setRules(newRules)
+                await saveRules(newRules)
+                chrome.runtime.sendMessage({ type: "filer:install_packs", packs: patch.active_packs })
+              }
+            }}
+          />
+        )}
         {tab === "rules" && (
           <RulesTab
             rules={rules}
@@ -199,6 +217,7 @@ export default function OptionsPage() {
 
 const NAV: { key: Tab; label: string; Icon: React.ElementType }[] = [
   { key: "packs", label: "My Packs", Icon: BookOpen },
+  { key: "templates", label: "Templates", Icon: Library },
   { key: "rules", label: "My Rules", Icon: List },
   { key: "activity", label: "Activity Log", Icon: Activity },
   { key: "appearance", label: "Appearance", Icon: Palette },
