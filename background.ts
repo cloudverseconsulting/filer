@@ -64,6 +64,7 @@ chrome.downloads.onDeterminingFilename.addListener((downloadItem, suggest) => {
           source_url: downloadItem.url,
           page_title: activeTab?.title || "",
           rule_used: result.ruleUsed,
+          rule_name: result.ruleUsed ? rules.find(r => r.id === result.ruleUsed)?.name ?? null : null,
           naming_method: result.namingMethod
         })
       }

@@ -12,33 +12,74 @@ export type FileExtension =
   | ".mp3"
   | string
 
-export type ConditionType =
-  | "source_domain"
-  | "filename_contains"
-  | "file_extension"
-  | "url_contains"
-  | "page_title_contains"
+// ── Condition fields — what to inspect ───────────────────────────────────────
+export type ConditionField =
+  // File
+  | "filename"           // filename without extension
+  | "file_extension"     // e.g. .pdf
+  | "file_size"          // in MB — Pro
+  | "mime_type"          // e.g. application/pdf — Pro
+  // Source
+  | "source_domain"      // e.g. stripe.com
+  | "full_url"           // complete download URL
+  | "url_path"           // URL path segment only
+  | "referrer_domain"    // page the download was triggered from — Pro
+  // Context
+  | "page_title"         // browser tab title at time of download
+  // Time (Pro)
+  | "download_hour"      // 0–23
+  | "download_day"       // 0=Sun … 6=Sat
 
-export type ConditionLogic = "ANY" | "ALL"
+// ── Operators — how to compare the field value ────────────────────────────────
+export type ConditionOperator =
+  | "contains"           // field contains value
+  | "not_contains"       // field does not contain value
+  | "contains_any_of"    // field contains any comma-separated item
+  | "contains_all_of"    // field contains every comma-separated item — Pro
+  | "starts_with"        // field starts with value
+  | "ends_with"          // field ends with value
+  | "equals"             // field exactly equals value
+  | "not_equals"         // field does not equal value
+  | "is_any_of"          // field exactly matches any comma-separated item
+  | "is_none_of"         // field matches none of the comma-separated items — Pro
+  | "matches_regex"      // field matches regex — Pro
+  | "gt"                 // numeric: greater than
+  | "lt"                 // numeric: less than
 
+// ── A single condition row ────────────────────────────────────────────────────
 export interface RuleCondition {
-  type: ConditionType
-  values: string[]
+  id: string
+  field: ConditionField
+  operator: ConditionOperator
+  value: string          // single value or comma-separated for *_any_of / *_all_of
 }
 
+// ── A group of conditions connected by AND or OR ──────────────────────────────
+// The rule fires when ANY group fully matches (groups are always OR-ed together).
+export interface ConditionGroup {
+  id: string
+  logic: "AND" | "OR"   // how conditions within this group are combined
+  conditions: RuleCondition[]
+}
+
+// ── Actions performed when the rule matches ───────────────────────────────────
 export interface RuleAction {
-  rename_to: string
-  move_to: string
+  rename_to: string      // rename template, e.g. "[page_title]_[date]"
+  move_to: string        // destination folder, can contain [YYYY], [MM], [domain]
+  skip_rename?: boolean  // move only, keep original filename
+  open_after?: boolean   // Pro: open file in default app after download
+  notify?: boolean       // Pro: show OS notification when rule fires
 }
 
+// ── Rule ─────────────────────────────────────────────────────────────────────
 export interface Rule {
   id: string
   name: string
+  description?: string
   pack?: string
   active: boolean
   priority: number
-  conditions: RuleCondition[]
-  condition_logic: ConditionLogic
+  condition_groups: ConditionGroup[]  // fires when ANY group matches
   actions: RuleAction
   created_at: string
   is_custom: boolean
@@ -54,6 +95,7 @@ export interface ActivityEntry {
   source_url: string
   page_title: string
   rule_used: string | null
+  rule_name?: string | null
   naming_method:
     | "page_title"
     | "url_path"
@@ -157,7 +199,19 @@ export type PersonaPack =
   | "cleanup_only"
   | "language_locale"
 
-export type Theme = "dark" | "light" | "midnight" | "forest" | "warm"
+export type Theme =
+  | "dark" | "light" | "midnight" | "forest" | "warm"
+  // Pro themes
+  | "heroic" | "pixel_trainer" | "pitch" | "gridiron" | "whites"
+  | "cyberpunk" | "arctic" | "ember" | "sakura" | "terminal"
+  | "obsidian" | "desert" | "ocean" | "neon_night" | "vintage"
+
+export const FREE_THEMES: Theme[] = ["dark", "light", "midnight", "forest", "warm"]
+export const PRO_THEMES: Theme[] = [
+  "heroic", "pixel_trainer", "pitch", "gridiron", "whites",
+  "cyberpunk", "arctic", "ember", "sakura", "terminal",
+  "obsidian", "desert", "ocean", "neon_night", "vintage"
+]
 
 export type DateFormat = "YYYY-MM-DD" | "DD-MM-YYYY" | "MM-DD-YYYY"
 

@@ -22,7 +22,8 @@ import { RuleBuilder } from "../components/RuleBuilder"
 import { RuleList } from "../components/RuleList"
 import { ThemeSwitcher } from "../components/ThemeSwitcher"
 import { Badge, Button, Modal, Select, Toggle } from "../components/ui"
-import { getRulesForPacks, PACKS } from "../lib/packs"
+import { getRulesForPacks, isPackFree, PACKS } from "../lib/packs"
+import { PRICING, type PlanType } from "../lib/pricing"
 import {
   clearActivity,
   loadActivity,
@@ -42,14 +43,14 @@ import type {
 
 type Tab = "packs" | "templates" | "rules" | "activity" | "appearance" | "account"
 
-const MAX_FREE_PACKS = 3
-const MAX_FREE_CUSTOM = 5
+const MAX_FREE_PACKS = PRICING.free.maxActivePacks
+const MAX_FREE_CUSTOM = PRICING.free.maxCustomRules
 
 export default function OptionsPage() {
   const [settings, setSettings] = useState<UserSettings | null>(null)
   const [rules, setRules] = useState<Rule[]>([])
   const [activity, setActivity] = useState<ActivityEntry[]>([])
-  const [tab, setTab] = useState<Tab>("packs")
+  const [tab, setTab] = useState<Tab>("templates")
   const [showUpgrade, setShowUpgrade] = useState(false)
 
   useEffect(() => {
@@ -81,7 +82,7 @@ export default function OptionsPage() {
   async function handlePackToggle(pack: PersonaPack) {
     if (!settings) return
     const active = settings.active_packs.includes(pack)
-    if (!active && !settings.is_paid && settings.active_packs.length >= MAX_FREE_PACKS) {
+    if (!active && !settings.is_paid && !isPackFree(pack)) {
       setShowUpgrade(true)
       return
     }
@@ -182,20 +183,14 @@ export default function OptionsPage() {
           />
         )}
         {tab === "activity" && (
-          <div>
-            <SectionHeader
-              title="Activity Log"
-              subtitle={`${activity.length} download${activity.length !== 1 ? "s" : ""} processed`}
-            />
-            <ActivityLog
-              entries={activity}
-              isPaid={settings.is_paid}
-              onUpgrade={() => setShowUpgrade(true)}
-            />
-          </div>
+          <ActivityTabWrapper
+            activity={activity}
+            settings={settings}
+            onUpgrade={() => setShowUpgrade(true)}
+          />
         )}
         {tab === "appearance" && (
-          <AppearanceTab settings={settings} onUpdate={updateSettings} />
+          <AppearanceTab settings={settings} onUpdate={updateSettings} isPaid={settings.is_paid} onUpgrade={() => setShowUpgrade(true)} />
         )}
         {tab === "account" && (
           <AccountTab
@@ -220,8 +215,8 @@ export default function OptionsPage() {
 // ──────────────────────────────────────────────
 
 const NAV_KEYS: { key: Tab; tKey: string; Icon: React.ElementType }[] = [
-  { key: "packs",      tKey: "nav.my_packs",   Icon: BookOpen },
   { key: "templates",  tKey: "nav.templates",   Icon: Library },
+  { key: "packs",      tKey: "nav.my_packs",   Icon: BookOpen },
   { key: "rules",      tKey: "nav.my_rules",    Icon: List },
   { key: "activity",   tKey: "nav.activity",    Icon: Activity },
   { key: "appearance", tKey: "nav.appearance",  Icon: Palette },
@@ -242,6 +237,7 @@ function Sidebar({
   onTabChange: (t: Tab) => void
   settings: UserSettings
 }) {
+  const { t } = useT()
   return (
     <aside className="w-52 flex-shrink-0 border-r border-border bg-bg-secondary flex flex-col py-6 px-3">
       <div className="flex items-center gap-2 px-3 mb-8">
@@ -272,14 +268,14 @@ function Sidebar({
       <div className="mt-auto border-t border-border pt-4 px-3">
         <div className="flex items-center justify-between">
           <span className="text-xs text-text-secondary">
-            {settings.extension_enabled ? "Enabled" : "Paused"}
+            {settings.extension_enabled ? t("sidebar.enabled") : t("sidebar.paused")}
           </span>
           <Toggle
             checked={settings.extension_enabled}
             onChange={async (v) => {
               await saveSettings({ extension_enabled: v })
             }}
-            label="Toggle Filer"
+            label={t("sidebar.enabled")}
           />
         </div>
       </div>
@@ -429,10 +425,14 @@ function RulesTab({
 
 function AppearanceTab({
   settings,
-  onUpdate
+  onUpdate,
+  isPaid,
+  onUpgrade
 }: {
   settings: UserSettings
   onUpdate: (patch: Partial<UserSettings>) => Promise<void>
+  isPaid: boolean
+  onUpgrade: () => void
 }) {
   const { t } = useT()
   const [pendingLang, setPendingLang] = useState<string | null>(null)
@@ -456,7 +456,12 @@ function AppearanceTab({
       <div className="flex flex-col gap-8">
         <div>
           <h2 className="mb-3 text-sm font-semibold text-text-primary">{t("appear.theme")}</h2>
-          <ThemeSwitcher current={settings.theme} onChange={(th) => onUpdate({ theme: th })} />
+          <ThemeSwitcher
+            current={settings.theme}
+            onChange={(th) => onUpdate({ theme: th })}
+            isPaid={isPaid}
+            onLockedClick={onUpgrade}
+          />
         </div>
 
         <div>
@@ -543,8 +548,7 @@ function AppearanceTab({
               </div>
             </div>
             <p className="text-sm text-text-secondary">
-              Switch the interface to <strong className="text-text-primary">{pendingLangMeta.native}</strong>?
-              The page will update immediately.
+              {t("appear.lang.switch_body", { lang: pendingLangMeta.native })}
             </p>
             <div className="flex gap-3">
               <Button
@@ -554,7 +558,7 @@ function AppearanceTab({
                   setPendingLang(null)
                 }}
               >
-                Apply
+                {t("appear.lang.apply")}
               </Button>
               <Button
                 variant="secondary"
@@ -599,11 +603,11 @@ function AccountTab({
               <p className="font-semibold text-text-primary">{t("acct.plan.pro")}</p>
               <p className="text-xs text-text-secondary">{t("acct.pro.subtitle")}</p>
             </div>
-            <Badge color="warning" className="ml-auto">Pro</Badge>
+            <Badge color="warning" className="ml-auto">{t("common.pro")}</Badge>
           </div>
           <div className="rounded-xl border border-border bg-bg-card p-4">
             <div className="flex flex-col gap-2 text-sm">
-              <Row label={t("acct.plan_label")} value="Pro" />
+              <Row label={t("acct.plan_label")} value={t("common.pro")} />
               <Row label={t("acct.active_rules")} value={String(rulesCount)} />
               <Row label={t("acct.sync")} value={t("acct.sync.pro")} />
             </div>
@@ -621,42 +625,25 @@ function AccountTab({
     <div>
       <SectionHeader title={t("acct.title")} />
       <div className="flex flex-col gap-4">
+        {/* Current limits */}
         <div className="rounded-xl border border-border bg-bg-card p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-text-secondary mb-3">
             {t("acct.plan.free")}
           </p>
           <div className="flex flex-col gap-2 text-sm">
             <Row label={t("acct.custom_rules")}
-              value={`${customCount}/${MAX_FREE_CUSTOM} used`}
+              value={t("acct.used_of", { n: customCount, max: MAX_FREE_CUSTOM })}
               warn={customCount >= MAX_FREE_CUSTOM} />
             <Row label={t("acct.active_packs")}
-              value={`${settings.active_packs.length}/${MAX_FREE_PACKS} used`}
-              warn={settings.active_packs.length >= MAX_FREE_PACKS} />
+              value={t("acct.used_of", { n: settings.active_packs.length, max: PRICING.free.maxActivePacks })}
+              warn={false} />
             <Row label={t("acct.history")} value={t("acct.history.free")} />
             <Row label={t("acct.sync")} value={t("acct.sync.free")} />
           </div>
         </div>
 
-        <div className="rounded-xl border border-accent/30 bg-accent/5 p-5">
-          <p className="text-base font-semibold text-text-primary mb-3">
-            {t("acct.upgrade.title")}
-          </p>
-          <div className="flex flex-col gap-2 mb-4">
-            {(["acct.feat.1","acct.feat.2","acct.feat.3","acct.feat.4","acct.feat.5"] as const).map((key) => (
-              <div key={key} className="flex items-center gap-2 text-sm text-text-secondary">
-                <CheckCircle size={14} className="text-success flex-shrink-0" />
-                {t(key)}
-              </div>
-            ))}
-          </div>
-          <div className="flex items-baseline gap-2 mb-4">
-            <span className="text-2xl font-bold text-text-primary">$5</span>
-            <span className="text-text-secondary text-sm">/month</span>
-            <span className="text-text-secondary text-xs ml-2">or $39/year</span>
-          </div>
-          <Button onClick={onUpgrade} className="w-full">{t("acct.upgrade.cta")}</Button>
-          <p className="mt-2 text-center text-xs text-text-secondary">{t("acct.trial_note")}</p>
-        </div>
+        {/* Plan cards */}
+        <PricingCards onSelect={onUpgrade} />
       </div>
     </div>
   )
@@ -691,36 +678,139 @@ function Row({
 function UpgradeModal({ onClose }: { onClose: () => void }) {
   const { t } = useT()
   return (
-    <Modal onClose={onClose} title={t("acct.upgrade.title")}>
+    <Modal onClose={onClose} title={t("price.choose_plan")}>
       <div className="p-6 flex flex-col gap-5">
-        <div className="flex flex-col gap-2.5">
-          {(["acct.feat.1","acct.feat.2","acct.feat.3","acct.feat.4","acct.feat.5"] as const).map((key) => (
-            <div key={key} className="flex items-center gap-2.5 text-sm text-text-secondary">
-              <CheckCircle size={15} className="text-success flex-shrink-0" />
-              {t(key)}
-            </div>
-          ))}
+        <div className="text-center">
+          <p className="text-sm font-medium text-text-primary">{t("price.headline")}</p>
+          <p className="text-xs text-text-secondary mt-1">{t("price.subheadline")}</p>
         </div>
 
-        <div className="rounded-lg bg-bg-secondary px-4 py-3">
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-text-primary">$5</span>
-            <span className="text-text-secondary text-sm">/month</span>
-          </div>
-          <p className="text-xs text-text-secondary mt-0.5">or $39/year — save 35%</p>
-        </div>
+        <PricingCards onSelect={onClose} />
 
-        <div className="flex flex-col gap-2">
-          <Button className="w-full"
-            onClick={() => window.open("https://filer.app/upgrade", "_blank")}>
-            {t("acct.upgrade.cta")}
-          </Button>
-          <button onClick={onClose}
-            className="text-xs text-text-secondary hover:text-text-primary transition-colors text-center py-1">
-            {t("common.cancel")}
-          </button>
-        </div>
+        <button onClick={onClose}
+          className="text-xs text-text-secondary hover:text-text-primary transition-colors text-center py-1">
+          {t("common.cancel")}
+        </button>
       </div>
     </Modal>
+  )
+}
+
+// ──────────────────────────────────────────────
+// Pricing cards — Monthly vs Lifetime
+// ──────────────────────────────────────────────
+
+function PricingCards({ onSelect }: { onSelect: (plan: PlanType) => void }) {
+  const { t } = useT()
+  const [selected, setSelected] = useState<PlanType>("lifetime")
+
+  const FEATURES = [
+    "acct.feat.1", "acct.feat.2", "acct.feat.3",
+    "acct.feat.4", "acct.feat.5", "acct.feat.6"
+  ] as const
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm font-semibold text-text-primary">{t("price.choose_plan")}</p>
+
+      <div className="grid grid-cols-2 gap-3">
+        {/* Monthly card */}
+        <button
+          onClick={() => setSelected("monthly")}
+          className={`relative flex flex-col rounded-xl border p-4 text-left transition-all ${
+            selected === "monthly"
+              ? "border-accent bg-accent/5 shadow-sm"
+              : "border-border bg-bg-card hover:border-accent/50"
+          }`}>
+          <p className="text-xs font-medium text-text-secondary mb-2">{t("price.monthly")}</p>
+          <div className="flex items-baseline gap-0.5">
+            <span className="text-2xl font-bold text-text-primary">{PRICING.monthly.display}</span>
+            <span className="text-xs text-text-secondary">{t("price.per_month")}</span>
+          </div>
+          <p className="mt-2 text-[10px] text-text-secondary">{t("price.coming_soon")}</p>
+          {selected === "monthly" && (
+            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent" />
+          )}
+        </button>
+
+        {/* Lifetime card — highlighted */}
+        <button
+          onClick={() => setSelected("lifetime")}
+          className={`relative flex flex-col rounded-xl border-2 p-4 text-left transition-all ${
+            selected === "lifetime"
+              ? "border-accent bg-accent/5 shadow-sm"
+              : "border-accent/40 bg-bg-card hover:border-accent"
+          }`}>
+          {/* Best Value badge */}
+          <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
+            <span className="rounded-full bg-accent px-2.5 py-0.5 text-[10px] font-bold text-white whitespace-nowrap">
+              {t("price.lifetime_badge")}
+            </span>
+          </div>
+          <p className="text-xs font-medium text-text-secondary mb-2 mt-1">{t("price.lifetime")}</p>
+          <div className="flex items-baseline gap-0.5">
+            <span className="text-2xl font-bold text-text-primary">{PRICING.lifetime.display}</span>
+          </div>
+          <p className="mt-1 text-[10px] text-text-secondary">{t("price.lifetime_note")}</p>
+          <div className="mt-2">
+            <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[9px] font-semibold text-warning">
+              {t("price.launch_label")}
+            </span>
+          </div>
+          {selected === "lifetime" && (
+            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent" />
+          )}
+        </button>
+      </div>
+
+      {/* Feature list */}
+      <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-bg-card px-4 py-3">
+        {FEATURES.map((key) => (
+          <div key={key} className="flex items-center gap-2 text-xs text-text-secondary">
+            <CheckCircle size={12} className="text-success flex-shrink-0" />
+            {t(key)}
+          </div>
+        ))}
+      </div>
+
+      {/* CTA */}
+      <Button className="w-full" onClick={() => {
+        console.log("upgrade clicked", selected)
+        onSelect(selected)
+      }}>
+        {selected === "lifetime" ? t("price.cta_lifetime") : t("price.cta_monthly")}
+      </Button>
+
+      {/* Launch pricing note */}
+      <p className="text-center text-[10px] text-text-secondary leading-relaxed">
+        {t("price.launch_note")}
+      </p>
+      <p className="text-center text-[10px] text-text-secondary">{t("price.coming_soon")}</p>
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────
+// Activity Tab Wrapper
+// ──────────────────────────────────────────────
+
+function ActivityTabWrapper({
+  activity,
+  settings,
+  onUpgrade
+}: {
+  activity: ActivityEntry[]
+  settings: UserSettings
+  onUpgrade: () => void
+}) {
+  const { t } = useT()
+  const subtitle = activity.length === 1
+    ? t("activity.subtitle", { n: activity.length })
+    : t("activity.subtitle_pl", { n: activity.length })
+  return (
+    <div>
+      <SectionHeader title={t("activity.title")} subtitle={subtitle} />
+      <ActivityLog entries={activity} isPaid={settings.is_paid} onUpgrade={onUpgrade} />
+    </div>
   )
 }

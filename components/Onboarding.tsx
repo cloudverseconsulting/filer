@@ -3,23 +3,17 @@ import { useEffect, useState } from "react"
 import { applyTheme, THEMES } from "../assets/themes"
 import { I18nProvider, useT } from "../contexts/I18nContext"
 import { LANGUAGES, t as rawT } from "../lib/i18n"
-import { PACK_CATEGORIES, PACKS } from "../lib/packs"
+import { FREE_PACKS, PACKS } from "../lib/packs"
 import { saveSettings } from "../lib/storage"
-import type { PackCategory, PersonaPack, Theme } from "../types"
-import { ThemeSwitcher } from "./ThemeSwitcher"
+import type { PersonaPack, Theme } from "../types"
 import { Button } from "./ui"
 
 interface Props {
   onComplete: () => void
 }
 
-const FEATURED_PACKS: PersonaPack[] = [
-  "consultant", "developer", "student", "finance", "researcher"
-]
-
-const CATEGORY_ORDER: PackCategory[] = [
-  "professional", "personal", "industry", "hobby", "meta"
-]
+// Only free themes shown during onboarding — no Pro upsell
+const FREE_THEME_KEYS: Theme[] = ["dark", "light", "midnight", "forest", "warm"]
 
 export function Onboarding({ onComplete }: Props) {
   const [screen, setScreen] = useState(0)
@@ -47,8 +41,9 @@ export function Onboarding({ onComplete }: Props) {
     })
     chrome.runtime.sendMessage(
       { type: "filer:install_packs", packs: selectedPacks },
-      () => setScreen(4)
+      () => { if (!chrome.runtime.lastError) setScreen(4) }
     )
+    setTimeout(() => setScreen(4), 800)
   }
 
   async function finish() {
@@ -56,16 +51,14 @@ export function Onboarding({ onComplete }: Props) {
     onComplete()
   }
 
-  // Screens: 0=Language, 1=Hero, 2=Persona, 3=Theme, 4=Permission, 5=Ready
-  const TOTAL_STEPS = 3 // persona, theme, permission shown as progress
-
+  // Screens: 0=Language, 1=Persona, 2=Theme, 3=Permission, 4=Ready
   return (
     <I18nProvider lang={lang}>
       <div className="bg-bg-primary text-text-primary min-h-screen flex flex-col">
-        {/* Progress dots (screens 2–4) */}
-        {screen >= 2 && screen <= 4 && (
+        {/* Progress bar (screens 1–3) */}
+        {screen >= 1 && screen <= 3 && (
           <div className="flex justify-center gap-2 pt-6">
-            {[2, 3, 4].map((i) => (
+            {[1, 2, 3].map((i) => (
               <span
                 key={i}
                 className={`h-1.5 w-6 rounded-full transition-colors ${
@@ -84,26 +77,23 @@ export function Onboarding({ onComplete }: Props) {
             />
           )}
           {screen === 1 && (
-            <HeroScreen onNext={() => setScreen(2)} />
-          )}
-          {screen === 2 && (
             <PersonaScreen
               selected={selectedPacks}
               onToggle={togglePack}
+              onNext={() => setScreen(2)}
+            />
+          )}
+          {screen === 2 && (
+            <ThemeScreen
+              theme={selectedTheme}
+              onChange={setSelectedTheme}
               onNext={() => setScreen(3)}
             />
           )}
           {screen === 3 && (
-            <ThemeScreen
-              theme={selectedTheme}
-              onChange={setSelectedTheme}
-              onNext={() => setScreen(4)}
-            />
-          )}
-          {screen === 4 && (
             <PermissionScreen onEnable={handleEnable} />
           )}
-          {screen === 5 && (
+          {screen === 4 && (
             <ReadyScreen packs={selectedPacks} onFinish={finish} />
           )}
         </div>
@@ -163,51 +153,6 @@ function LanguageScreen({
   )
 }
 
-// ── Hero Screen ───────────────────────────────────────────────────────────────
-
-function HeroScreen({ onNext }: { onNext: () => void }) {
-  const { t } = useT()
-  return (
-    <div className="flex max-w-lg flex-col items-center text-center gap-6">
-      <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-accent/20 text-accent">
-        <Folder size={40} />
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <h1 className="text-4xl font-bold text-text-primary leading-tight">
-          Your downloads,<br />finally organized.
-        </h1>
-        <p className="text-lg text-text-secondary">
-          Filer renames and sorts every file you download — automatically.
-        </p>
-      </div>
-
-      <div className="w-full rounded-xl border border-border bg-bg-secondary p-4 text-left">
-        <div className="flex flex-col gap-2">
-          {[
-            { before: "document(3).pdf", after: "Q2_Revenue_Report_2026-06-15.pdf", folder: "Finance/Invoices/" },
-            { before: "export_1234567890.csv", after: "Salesforce_Report_2026-06-15.csv", folder: "Salesforce/" },
-            { before: "untitled.pptx", after: "Product_Roadmap_2026-06-15.pptx", folder: "Presentations/" }
-          ].map((item, i) => (
-            <div key={i} className="flex items-center gap-2 text-xs">
-              <span className="text-text-secondary line-through opacity-60">{item.before}</span>
-              <span className="text-text-secondary">→</span>
-              <div className="flex flex-col">
-                <span className="text-success font-medium">{item.after}</span>
-                <span className="text-text-secondary text-[10px]">{item.folder}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <Button onClick={onNext} size="md" className="px-8">
-        {t("common.continue")} <ArrowRight size={16} />
-      </Button>
-    </div>
-  )
-}
-
 // ── Persona Screen ────────────────────────────────────────────────────────────
 
 function PersonaScreen({
@@ -220,52 +165,45 @@ function PersonaScreen({
   onNext: () => void
 }) {
   const { t } = useT()
+  const hasSelection = selected.length > 0
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6 w-full">
+    <div className="flex max-w-xl flex-col gap-6 w-full">
       <div className="text-center">
         <h2 className="text-3xl font-bold text-text-primary">
           {t("ob.persona.title")}
         </h2>
         <p className="mt-2 text-text-secondary">
-          {t("ob.persona.subtitle")}
+          Pick what fits you — Filer sets up smart folder rules for each one.
         </p>
       </div>
 
-      {/* Featured */}
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-text-secondary">
-          {t("ob.persona.popular")}
-        </p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {FEATURED_PACKS.map((pack) => (
-            <PackButton key={pack} pack={pack} active={selected.includes(pack)} onToggle={onToggle} />
-          ))}
-        </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {FREE_PACKS.map((pack) => (
+          <PackButton
+            key={pack}
+            pack={pack}
+            active={selected.includes(pack)}
+            onToggle={onToggle}
+          />
+        ))}
       </div>
 
-      {/* By category */}
-      {CATEGORY_ORDER.map((cat) => {
-        const catMeta = PACK_CATEGORIES[cat]
-        const catPacks = catMeta.packs.filter((p) => !FEATURED_PACKS.includes(p))
-        return (
-          <div key={cat}>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-text-secondary">
-              {catMeta.emoji} {catMeta.label}
-            </p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {catPacks.map((pack) => (
-                <PackButton key={pack} pack={pack} active={selected.includes(pack)} onToggle={onToggle} />
-              ))}
-            </div>
-          </div>
-        )
-      })}
-
-      <div className="flex justify-center pt-2">
-        <Button onClick={onNext} disabled={selected.length === 0} className="px-8">
-          {t("common.continue")} <ArrowRight size={16} />
+      <div className="flex flex-col items-center gap-2">
+        <Button onClick={onNext} className="px-8">
+          {hasSelection
+            ? `Set up ${selected.length} pack${selected.length > 1 ? "s" : ""}`
+            : "Skip for now"}
+          <ArrowRight size={16} />
         </Button>
+        {hasSelection && (
+          <button
+            onClick={onNext}
+            className="text-xs text-text-secondary hover:text-text-primary transition-colors"
+          >
+            You can add more packs later in Settings
+          </button>
+        )}
       </div>
     </div>
   )
@@ -280,7 +218,9 @@ function PackButton({
   active: boolean
   onToggle: (p: PersonaPack) => void
 }) {
+  const { t } = useT()
   const def = PACKS[pack]
+
   return (
     <button
       onClick={() => onToggle(pack)}
@@ -296,8 +236,12 @@ function PackButton({
         </span>
       )}
       <span className="text-xl">{def.emoji}</span>
-      <span className="text-xs font-semibold text-text-primary leading-tight">{def.label}</span>
-      <span className="text-[10px] text-text-secondary leading-snug line-clamp-2">{def.description}</span>
+      <span className="text-xs font-semibold text-text-primary leading-tight">
+        {t(`pack.${pack}.name`)}
+      </span>
+      <span className="text-[10px] text-text-secondary leading-snug line-clamp-2">
+        {t(`pack.${pack}.desc`)}
+      </span>
     </button>
   )
 }
@@ -314,13 +258,48 @@ function ThemeScreen({
   onNext: () => void
 }) {
   const { t } = useT()
+
   return (
-    <div className="flex max-w-xl flex-col gap-6 w-full">
+    <div className="flex max-w-lg flex-col gap-6 w-full">
       <div className="text-center">
         <h2 className="text-3xl font-bold text-text-primary">{t("ob.theme.title")}</h2>
-        <p className="mt-2 text-text-secondary">{t("ob.theme.subtitle")}</p>
+        <p className="mt-2 text-text-secondary">Pick how Filer looks. You can change this any time.</p>
       </div>
-      <ThemeSwitcher current={theme} onChange={onChange} />
+
+      <div className="grid grid-cols-5 gap-3">
+        {FREE_THEME_KEYS.map((key) => {
+          const def = THEMES[key]
+          const active = theme === key
+          const isLight = ["light", "warm"].includes(key)
+
+          return (
+            <button
+              key={key}
+              onClick={() => onChange(key)}
+              className={`relative flex flex-col items-center gap-2 rounded-xl border p-3 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                active ? "border-accent shadow-lg" : "border-border hover:border-text-secondary"
+              }`}
+              style={{ background: def.bg }}>
+              <div className="flex gap-0.5 rounded overflow-hidden w-full h-4">
+                {def.swatches.map((color, i) => (
+                  <div key={i} className="flex-1" style={{ background: color }} />
+                ))}
+              </div>
+              {active && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-white">
+                  <CheckCircle size={10} strokeWidth={3} />
+                </span>
+              )}
+              <span
+                className="text-[10px] font-medium truncate w-full text-center"
+                style={{ color: isLight ? "#0f172a" : "#e2e8f0" }}>
+                {def.label}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
       <div className="flex justify-center">
         <Button onClick={onNext} className="px-8">
           {t("common.continue")} <ArrowRight size={16} />
@@ -353,15 +332,18 @@ function PermissionScreen({ onEnable }: { onEnable: () => void }) {
         <Shield size={32} />
       </div>
       <div>
-        <h2 className="text-2xl font-bold text-text-primary">{t("ob.perm.title")}</h2>
-        <p className="mt-2 text-text-secondary text-sm">{t("ob.perm.subtitle")}</p>
+        <h2 className="text-2xl font-bold text-text-primary">One last step</h2>
+        <p className="mt-2 text-text-secondary text-sm">
+          Filer needs access to your downloads so it can rename and sort files automatically.
+          It never uploads anything — everything stays on your computer.
+        </p>
       </div>
 
       <div className="w-full flex flex-col gap-3 rounded-xl border border-border bg-bg-secondary p-4 text-left">
         {[
-          { Icon: Folder,   label: t("ob.perm.downloads") },
-          { Icon: Sparkles, label: t("ob.perm.tabs") },
-          { Icon: Zap,      label: t("ob.perm.storage") },
+          { Icon: Folder,   label: "See files as they download" },
+          { Icon: Sparkles, label: "Read the page title for smarter naming" },
+          { Icon: Zap,      label: "Save your settings between sessions" },
         ].map(({ Icon, label }) => (
           <div key={label} className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 text-accent flex-shrink-0">
@@ -374,18 +356,18 @@ function PermissionScreen({ onEnable }: { onEnable: () => void }) {
 
       {granted ? (
         <Button className="px-8" onClick={onEnable}>
-          {t("ob.perm.granted")} <ArrowRight size={16} />
+          <CheckCircle size={16} /> All set — let's go
         </Button>
       ) : (
         <div className="flex flex-col items-center gap-2 w-full">
           <Button className="px-8 w-full" onClick={requestPermission}>
-            {t("ob.perm.grant")}
+            Allow access
           </Button>
           <button
             onClick={onEnable}
             className="text-xs text-text-secondary hover:text-text-primary transition-colors"
           >
-            {t("ob.perm.skip")}
+            I'll do this later
           </button>
         </div>
       )}
@@ -402,18 +384,26 @@ function ReadyScreen({
   packs: PersonaPack[]
   onFinish: () => void
 }) {
-  const { t } = useT()
+  const hasPacks = packs.length > 0
+
   return (
     <div className="flex max-w-md flex-col items-center text-center gap-6">
       <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-success/20 text-success">
         <CheckCircle size={40} />
       </div>
+
       <div>
-        <h2 className="text-3xl font-bold text-text-primary">{t("ob.ready.title")}</h2>
-        <p className="mt-2 text-text-secondary">{t("ob.ready.subtitle")}</p>
+        <h2 className="text-3xl font-bold text-text-primary">
+          {hasPacks ? "You're all set!" : "Filer is ready"}
+        </h2>
+        <p className="mt-2 text-text-secondary">
+          {hasPacks
+            ? `${packs.length} pack${packs.length > 1 ? "s" : ""} installed. Your downloads will be organized automatically.`
+            : "Your downloads will be organized automatically."}
+        </p>
       </div>
 
-      {packs.length > 0 && (
+      {hasPacks && (
         <div className="w-full flex flex-wrap gap-2 justify-center">
           {packs.map((p) => (
             <span
@@ -421,14 +411,21 @@ function ReadyScreen({
               className="flex items-center gap-1.5 rounded-full border border-border bg-bg-secondary px-3 py-1 text-xs text-text-secondary"
             >
               <span>{PACKS[p]?.emoji}</span>
-              <span>{PACKS[p]?.label}</span>
+              <span>{PACKS[p]?.label ?? p}</span>
             </span>
           ))}
         </div>
       )}
 
-      <Button onClick={onFinish} className="px-8">
-        {t("ob.ready.cta")} <ArrowRight size={16} />
+      <div className="w-full rounded-xl border border-border bg-bg-secondary p-4 text-left">
+        <p className="text-xs text-text-secondary leading-relaxed">
+          <span className="font-medium text-text-primary">Try it now:</span>{" "}
+          download any file in Chrome. Filer will rename and sort it — no extra clicks.
+        </p>
+      </div>
+
+      <Button onClick={onFinish} size="md" className="px-10">
+        Open Filer <ArrowRight size={16} />
       </Button>
     </div>
   )

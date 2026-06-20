@@ -183,8 +183,13 @@ function ActivityRow({ entry }: { entry: ActivityEntry }) {
           <span>•</span>
           <span className="flex-shrink-0">{relativeTime(entry.timestamp)}</span>
         </div>
-        <div className="mt-1.5">
+        <div className="mt-1 flex items-center gap-1.5">
           <MethodBadge method={entry.naming_method} />
+          {entry.naming_method === "rule_match" && entry.rule_name && (
+            <span className="text-[10px] text-text-secondary truncate">
+              {entry.rule_name}
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -226,11 +231,17 @@ function PausedBanner() {
 }
 
 function EmptyState() {
-  const { t } = useT()
   return (
-    <div className="text-text-secondary flex flex-col items-center justify-center px-2 py-10 text-center">
-      <Folder size={32} className="mb-2 opacity-50" />
-      <div className="text-sm">{t("popup.no_activity")}</div>
+    <div className="flex flex-col items-center justify-center px-4 py-10 text-center gap-3">
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+        <Folder size={28} />
+      </div>
+      <div>
+        <div className="text-sm font-medium text-text-primary">Ready to organize</div>
+        <div className="mt-1 text-xs text-text-secondary leading-relaxed">
+          Download any file — Filer will rename and sort it automatically.
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,9 +1,8 @@
 import { useState, useMemo } from "react"
+import { ChevronDown, ChevronRight } from "lucide-react"
+import { useT } from "../contexts/I18nContext"
 import type { PackCategory, PersonaPack, UserSettings } from "../types"
-import { PACKS, PACK_CATEGORIES, ALL_PACKS } from "../lib/packs"
-import { Lock } from "lucide-react"
-
-const MAX_FREE_PACKS = 3
+import { PACKS, PACK_CATEGORIES, ALL_PACKS, FREE_PACKS, isPackFree } from "../lib/packs"
 
 const CATEGORY_ORDER: PackCategory[] = [
   "professional", "personal", "industry", "hobby", "meta"
@@ -15,183 +14,166 @@ interface Props {
 }
 
 export function PackLibrary({ settings, onSettingsChange }: Props) {
+  const { t } = useT()
   const [search, setSearch] = useState("")
-  const [activeCategory, setActiveCategory] = useState<PackCategory | "all">("all")
+  const [moreOpen, setMoreOpen] = useState(false)
 
   const installed = new Set(settings.active_packs)
   const isPaid = settings.is_paid
-  const atLimit = !isPaid && installed.size >= MAX_FREE_PACKS
-
-  const filteredPacks = useMemo<PersonaPack[]>(() => {
-    const q = search.toLowerCase()
-    return ALL_PACKS.filter((id) => {
-      const pack = PACKS[id]
-      if (!pack) return false
-      if (activeCategory !== "all" && pack.category !== activeCategory) return false
-      if (q) {
-        return (
-          pack.label.toLowerCase().includes(q) ||
-          pack.description.toLowerCase().includes(q) ||
-          id.toLowerCase().includes(q)
-        )
-      }
-      return true
-    })
-  }, [search, activeCategory])
+  const q = search.toLowerCase().trim()
 
   function togglePack(id: PersonaPack) {
+    if (!isPaid && !isPackFree(id)) return
     const next = new Set(installed)
-    if (next.has(id)) {
-      next.delete(id)
-    } else {
-      if (atLimit) return
-      next.add(id)
-    }
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
     onSettingsChange({ active_packs: Array.from(next) })
   }
 
+  function matches(id: PersonaPack) {
+    if (!q) return true
+    const p = PACKS[id]
+    if (!p) return false
+    return p.label.toLowerCase().includes(q) || p.description.toLowerCase().includes(q) || id.includes(q)
+  }
+
+  const visibleFree = useMemo(() => FREE_PACKS.filter(matches), [q])
+  const visiblePro  = useMemo(() => ALL_PACKS.filter(id => !isPackFree(id) && matches(id)), [q])
+  const isSearching = q.length > 0
+
   return (
-    <div className="flex flex-col gap-4">
-      {/* Header */}
+    <div className="flex flex-col gap-6">
       <div>
-        <h2 style={{ color: "var(--text-primary)", fontSize: 18, fontWeight: 600, marginBottom: 4 }}>
-          Template Library
-        </h2>
-        <p style={{ color: "var(--text-muted)", fontSize: 13 }}>
-          {ALL_PACKS.length} persona packs — each pre-wired with rules for your workflow.{" "}
-          {!isPaid && (
-            <span style={{ color: "var(--gold)" }}>
-              Free plan: {installed.size}/{MAX_FREE_PACKS} active.
-            </span>
-          )}
+        <h2 className="text-lg font-semibold text-text-primary">Template Library</h2>
+        <p className="text-sm text-text-secondary mt-1">
+          Pre-built rule packs. Install the ones that match how you work.
         </p>
       </div>
 
-      {/* Search */}
       <input
         type="text"
         placeholder="Search packs…"
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        style={{
-          width: "100%",
-          padding: "8px 12px",
-          borderRadius: 8,
-          border: "1px solid var(--border)",
-          background: "var(--surface)",
-          color: "var(--text-primary)",
-          fontSize: 14,
-          outline: "none",
-        }}
+        onChange={e => setSearch(e.target.value)}
+        className="w-full rounded-lg border border-border bg-bg-card px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-1 focus:ring-accent"
       />
 
-      {/* Category tabs */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <CategoryTab
-          label="All"
-          emoji="🗂️"
-          active={activeCategory === "all"}
-          count={ALL_PACKS.length}
-          onClick={() => setActiveCategory("all")}
-        />
-        {CATEGORY_ORDER.map((cat) => {
-          const meta = PACK_CATEGORIES[cat]
-          return (
-            <CategoryTab
-              key={cat}
-              label={meta.label}
-              emoji={meta.emoji}
-              active={activeCategory === cat}
-              count={meta.packs.length}
-              onClick={() => setActiveCategory(cat)}
-            />
-          )
-        })}
-      </div>
-
-      {/* Results count */}
-      <p style={{ color: "var(--text-muted)", fontSize: 12 }}>
-        {filteredPacks.length} pack{filteredPacks.length !== 1 ? "s" : ""}
-        {search ? ` matching "${search}"` : ""}
-      </p>
-
-      {/* Grid */}
-      {activeCategory === "all" && !search
-        ? (
-          // Grouped by category when browsing "All" without search
-          <div className="flex flex-col gap-6">
-            {CATEGORY_ORDER.map((cat) => {
-              const catMeta = PACK_CATEGORIES[cat]
-              const catPacks = catMeta.packs.filter((p) => filteredPacks.includes(p))
-              if (catPacks.length === 0) return null
-              return (
-                <div key={cat}>
-                  <h3 style={{ color: "var(--text-secondary)", fontSize: 12, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 10 }}>
-                    {catMeta.emoji} {catMeta.label}
-                  </h3>
-                  <PackGrid packs={catPacks} installed={installed} atLimit={atLimit} isPaid={isPaid} onToggle={togglePack} />
-                </div>
-              )
-            })}
+      {isSearching ? (
+        <div className="flex flex-col gap-6">
+          {visibleFree.length > 0 && (
+            <div>
+              <SectionLabel text="Available now" />
+              <Grid packs={visibleFree} installed={installed} isPaid={isPaid} onToggle={togglePack} />
+            </div>
+          )}
+          {visiblePro.length > 0 && (
+            <div>
+              <SectionLabel text="Requires Pro" dim />
+              <Grid packs={visiblePro} installed={installed} isPaid={isPaid} onToggle={togglePack} />
+            </div>
+          )}
+          {visibleFree.length === 0 && visiblePro.length === 0 && (
+            <p className="text-sm text-text-secondary py-8 text-center">No packs match "{q}"</p>
+          )}
+        </div>
+      ) : isPaid ? (
+        /* Paid users — everything by category */
+        <div className="flex flex-col gap-6">
+          {CATEGORY_ORDER.map(cat => {
+            const meta = PACK_CATEGORIES[cat]
+            return (
+              <div key={cat}>
+                <SectionLabel text={`${meta.emoji} ${t(`tmpl.cat.${cat}`)}`} />
+                <Grid packs={meta.packs} installed={installed} isPaid={isPaid} onToggle={togglePack} />
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        /* Free users — available packs then more */
+        <div className="flex flex-col gap-8">
+          <div>
+            <Grid packs={FREE_PACKS} installed={installed} isPaid={isPaid} onToggle={togglePack} />
           </div>
-        )
-        : (
-          <PackGrid packs={filteredPacks} installed={installed} atLimit={atLimit} isPaid={isPaid} onToggle={togglePack} />
-        )
-      }
+
+          {/* More packs accordion */}
+          <div className="border-t border-border pt-6">
+            <button
+              onClick={() => setMoreOpen(v => !v)}
+              className="flex w-full items-center justify-between text-left group"
+            >
+              <div>
+                <span className="text-sm font-semibold text-text-primary">
+                  More packs
+                </span>
+                <span className="ml-2 text-xs text-text-secondary">
+                  {ALL_PACKS.length - FREE_PACKS.length} packs across every workflow
+                </span>
+              </div>
+              {moreOpen
+                ? <ChevronDown size={15} className="text-text-secondary" />
+                : <ChevronRight size={15} className="text-text-secondary" />
+              }
+            </button>
+
+            {moreOpen && (
+              <div className="mt-5 flex flex-col gap-6">
+                {CATEGORY_ORDER.map(cat => {
+                  const meta = PACK_CATEGORIES[cat]
+                  const proCatPacks = meta.packs.filter(p => !isPackFree(p))
+                  if (proCatPacks.length === 0) return null
+                  return (
+                    <div key={cat}>
+                      <SectionLabel text={`${meta.emoji} ${t(`tmpl.cat.${cat}`)}`} dim />
+                      <Grid packs={proCatPacks} installed={installed} isPaid={isPaid} onToggle={togglePack} />
+                    </div>
+                  )
+                })}
+
+                <div className="rounded-xl border border-border bg-bg-secondary px-5 py-4">
+                  <p className="text-sm font-medium text-text-primary">
+                    Get all {ALL_PACKS.length - FREE_PACKS.length} packs with Pro
+                  </p>
+                  <p className="text-xs text-text-secondary mt-1 mb-3">
+                    One upgrade unlocks everything — including new packs added later.
+                  </p>
+                  <button
+                    className="rounded-lg px-4 py-1.5 text-sm font-semibold"
+                    style={{ background: "#d4af37", color: "#000" }}>
+                    View plans
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function CategoryTab({ label, emoji, active, count, onClick }: {
-  label: string; emoji: string; active: boolean; count: number; onClick: () => void
-}) {
+function SectionLabel({ text, dim }: { text: string; dim?: boolean }) {
   return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: "5px 12px",
-        borderRadius: 20,
-        border: "1px solid",
-        borderColor: active ? "var(--gold)" : "var(--border)",
-        background: active ? "var(--gold)" : "var(--surface)",
-        color: active ? "#000" : "var(--text-secondary)",
-        fontSize: 13,
-        fontWeight: active ? 600 : 400,
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        gap: 5,
-      }}
-    >
-      <span>{emoji}</span>
-      <span>{label}</span>
-      <span style={{ opacity: 0.65, fontSize: 11 }}>({count})</span>
-    </button>
+    <p className={`mb-3 text-xs font-semibold uppercase tracking-widest ${dim ? "text-text-secondary opacity-60" : "text-text-secondary"}`}>
+      {text}
+    </p>
   )
 }
 
-function PackGrid({ packs, installed, atLimit, isPaid, onToggle }: {
+function Grid({ packs, installed, isPaid, onToggle }: {
   packs: PersonaPack[]
   installed: Set<PersonaPack>
-  atLimit: boolean
   isPaid: boolean
   onToggle: (id: PersonaPack) => void
 }) {
   return (
-    <div style={{
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-      gap: 10,
-    }}>
-      {packs.map((id) => (
-        <PackCard
+    <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
+      {packs.map(id => (
+        <Card
           key={id}
           id={id}
           installed={installed.has(id)}
-          locked={!installed.has(id) && atLimit && !isPaid}
+          locked={!isPaid && !isPackFree(id)}
           onToggle={() => onToggle(id)}
         />
       ))}
@@ -199,74 +181,50 @@ function PackGrid({ packs, installed, atLimit, isPaid, onToggle }: {
   )
 }
 
-function PackCard({ id, installed, locked, onToggle }: {
+function Card({ id, installed, locked, onToggle }: {
   id: PersonaPack
   installed: boolean
   locked: boolean
   onToggle: () => void
 }) {
+  const { t } = useT()
   const pack = PACKS[id]
   if (!pack) return null
 
   return (
-    <div style={{
-      position: "relative",
-      borderRadius: 10,
-      border: "1px solid",
-      borderColor: installed ? "var(--gold)" : "var(--border)",
-      background: installed ? "color-mix(in srgb, var(--gold) 8%, var(--surface))" : "var(--surface)",
-      padding: "12px 14px",
-      display: "flex",
-      flexDirection: "column",
-      gap: 6,
-      transition: "border-color 0.15s",
-    }}>
-      {/* Top row */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 22 }}>{pack.emoji}</span>
-          <span style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>
-            {pack.label}
-          </span>
-        </div>
-        {installed && (
-          <span style={{
-            fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
-            color: "var(--gold)", whiteSpace: "nowrap"
-          }}>Active</span>
-        )}
+    <div
+      className="flex flex-col gap-2 rounded-xl border p-3 transition-colors"
+      style={{
+        borderColor: installed ? "var(--accent)" : "var(--border)",
+        background: installed ? "color-mix(in srgb, var(--accent) 6%, var(--surface))" : "var(--surface)",
+        opacity: locked ? 0.55 : 1,
+      }}>
+      <div className="flex items-center gap-2">
+        <span className="text-xl">{pack.emoji}</span>
+        <span className="text-[13px] font-semibold text-text-primary leading-tight">
+          {t(`pack.${id}.name`)}
+        </span>
       </div>
 
-      {/* Description */}
-      <p style={{ color: "var(--text-muted)", fontSize: 12, lineHeight: 1.5, margin: 0 }}>
-        {pack.description}
+      <p className="text-[11px] text-text-secondary leading-relaxed flex-1">
+        {t(`pack.${id}.desc`)}
       </p>
 
-      {/* Footer */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
-        <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
-          {pack.rules.length} rule{pack.rules.length !== 1 ? "s" : ""}
-        </span>
+      <div className="flex items-center justify-between mt-1">
+        <span className="text-[11px] text-text-secondary">{pack.rules.length} rules</span>
         {locked ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text-muted)", fontSize: 12 }}>
-            <Lock size={12} />
-            <span>Upgrade</span>
-          </div>
+          <span className="text-[11px] text-text-secondary">Pro</span>
         ) : (
           <button
             onClick={onToggle}
+            className="rounded-md px-3 py-1 text-xs font-semibold transition-colors"
             style={{
-              padding: "4px 12px",
-              borderRadius: 6,
               border: "1px solid",
-              borderColor: installed ? "var(--border)" : "var(--gold)",
-              background: installed ? "transparent" : "var(--gold)",
-              color: installed ? "var(--text-secondary)" : "#000",
-              fontSize: 12,
-              fontWeight: 600,
+              borderColor: installed ? "var(--border)" : "var(--accent)",
+              background: installed ? "transparent" : "color-mix(in srgb, var(--accent) 10%, transparent)",
+              color: installed ? "var(--text-secondary)" : "var(--accent)",
               cursor: "pointer",
-            }}
-          >
+            }}>
             {installed ? "Remove" : "Install"}
           </button>
         )}
