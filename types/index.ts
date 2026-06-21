@@ -224,6 +224,9 @@ export interface UserSettings {
   enable_log: boolean
   extension_enabled: boolean
   is_paid: boolean
+  license_key?: string
+  license_email?: string
+  license_plan?: "monthly" | "lifetime"
   language: string
 }
 

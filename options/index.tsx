@@ -579,6 +579,8 @@ function AppearanceTab({
 // Account Tab
 // ──────────────────────────────────────────────
 
+const API_BASE = "https://filer-api.vercel.app"
+
 function AccountTab({
   settings,
   rulesCount,
@@ -591,6 +593,44 @@ function AccountTab({
   onUpgrade: () => void
 }) {
   const { t } = useT()
+  const [licenseKey, setLicenseKey] = useState("")
+  const [verifying, setVerifying] = useState(false)
+  const [licenseError, setLicenseError] = useState("")
+
+  async function handleVerify() {
+    const key = licenseKey.trim().toUpperCase()
+    if (!key) return
+    setVerifying(true)
+    setLicenseError("")
+    try {
+      const res = await fetch(`${API_BASE}/api/verify-license?key=${encodeURIComponent(key)}`)
+      const data = await res.json()
+      if (data.valid) {
+        await saveSettings({ is_paid: true, license_key: key, license_email: data.email, license_plan: data.plan })
+        window.location.reload()
+      } else {
+        setLicenseError(data.reason === "revoked" ? "This license has been revoked." : "License key not found. Check your email and try again.")
+      }
+    } catch {
+      setLicenseError("Could not reach the license server. Check your connection.")
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  async function handleUpgradeClick(plan: "monthly" | "lifetime") {
+    try {
+      const res = await fetch(`${API_BASE}/api/create-checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan })
+      })
+      const { url } = await res.json()
+      if (url) chrome.tabs.create({ url })
+    } catch {
+      onUpgrade()
+    }
+  }
 
   if (settings.is_paid) {
     return (
@@ -600,22 +640,20 @@ function AccountTab({
           <div className="flex items-center gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4">
             <span className="text-2xl">⭐</span>
             <div>
-              <p className="font-semibold text-text-primary">{t("acct.plan.pro")}</p>
-              <p className="text-xs text-text-secondary">{t("acct.pro.subtitle")}</p>
+              <p className="font-semibold text-text-primary">Filer Pro</p>
+              <p className="text-xs text-text-secondary">
+                {(settings as any).license_email ?? "All features unlocked"}
+              </p>
             </div>
-            <Badge color="warning" className="ml-auto">{t("common.pro")}</Badge>
+            <Badge color="warning" className="ml-auto">Pro</Badge>
           </div>
           <div className="rounded-xl border border-border bg-bg-card p-4">
             <div className="flex flex-col gap-2 text-sm">
-              <Row label={t("acct.plan_label")} value={t("common.pro")} />
-              <Row label={t("acct.active_rules")} value={String(rulesCount)} />
-              <Row label={t("acct.sync")} value={t("acct.sync.pro")} />
+              <Row label="Plan" value={(settings as any).license_plan === "monthly" ? "Pro Monthly" : "Pro Lifetime"} />
+              <Row label="Active rules" value={String(rulesCount)} />
+              <Row label="License key" value={(settings as any).license_key ?? "—"} />
             </div>
           </div>
-          <Button variant="secondary" size="sm"
-            onClick={() => window.open("https://filer.app/billing", "_blank")}>
-            {t("acct.manage")}
-          </Button>
         </div>
       </div>
     )
@@ -628,7 +666,7 @@ function AccountTab({
         {/* Current limits */}
         <div className="rounded-xl border border-border bg-bg-card p-4">
           <p className="text-xs font-medium uppercase tracking-wider text-text-secondary mb-3">
-            {t("acct.plan.free")}
+            Free plan
           </p>
           <div className="flex flex-col gap-2 text-sm">
             <Row label={t("acct.custom_rules")}
@@ -637,13 +675,55 @@ function AccountTab({
             <Row label={t("acct.active_packs")}
               value={t("acct.used_of", { n: settings.active_packs.length, max: PRICING.free.maxActivePacks })}
               warn={false} />
-            <Row label={t("acct.history")} value={t("acct.history.free")} />
-            <Row label={t("acct.sync")} value={t("acct.sync.free")} />
+            <Row label={t("acct.history")} value="30 days" />
           </div>
         </div>
 
-        {/* Plan cards */}
-        <PricingCards onSelect={onUpgrade} />
+        {/* Upgrade buttons */}
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={() => handleUpgradeClick("lifetime")}
+            className="flex items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors hover:bg-bg-secondary"
+            style={{ borderColor: "#d4af37", background: "#d4af3710" }}>
+            <div>
+              <p className="font-semibold text-text-primary">Pro Lifetime <span className="text-xs font-normal text-text-secondary ml-1">Launch pricing</span></p>
+              <p className="text-xs text-text-secondary mt-0.5">All packs, unlimited rules, forever</p>
+            </div>
+            <span className="text-lg font-bold" style={{ color: "#d4af37" }}>$29.99</span>
+          </button>
+          <button
+            onClick={() => handleUpgradeClick("monthly")}
+            className="flex items-center justify-between rounded-xl border border-border bg-bg-card px-4 py-3 text-left transition-colors hover:bg-bg-secondary">
+            <div>
+              <p className="font-semibold text-text-primary">Pro Monthly</p>
+              <p className="text-xs text-text-secondary mt-0.5">Cancel any time</p>
+            </div>
+            <span className="text-lg font-bold text-text-primary">$4.99<span className="text-xs font-normal text-text-secondary">/mo</span></span>
+          </button>
+        </div>
+
+        {/* License key entry */}
+        <div className="rounded-xl border border-border bg-bg-card p-4">
+          <p className="text-xs font-medium text-text-secondary mb-2">Already purchased? Enter your license key</p>
+          <div className="flex gap-2">
+            <input
+              value={licenseKey}
+              onChange={e => setLicenseKey(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleVerify()}
+              placeholder="FILER-XXXX-XXXX-XXXX-XXXX-XXXX"
+              className="flex-1 rounded-lg border border-border bg-bg-secondary px-3 py-2 text-xs text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-1 focus:ring-accent font-mono"
+            />
+            <Button size="sm" onClick={handleVerify} disabled={verifying}>
+              {verifying ? "…" : "Activate"}
+            </Button>
+          </div>
+          {licenseError && (
+            <p className="mt-2 text-xs text-red-400">{licenseError}</p>
+          )}
+          <p className="mt-2 text-[11px] text-text-secondary">
+            Your license key was emailed to you after purchase.
+          </p>
+        </div>
       </div>
     </div>
   )
