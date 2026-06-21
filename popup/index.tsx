@@ -109,8 +109,13 @@ function Header({
   return (
     <div className="border-border flex items-center justify-between border-b px-4 py-3">
       <div className="flex items-center gap-2">
-        <div className="bg-accent flex h-7 w-7 items-center justify-center rounded-md text-white">
-          <Folder size={16} />
+        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#1a1f2e] border border-border/60">
+          <svg width="17" height="17" viewBox="0 0 512 512" fill="none" aria-hidden="true">
+            <path d="M115 183C115 166 128 153 145 153H222L260 191H367C384 191 397 204 397 221V341C397 358 384 371 367 371H145C128 371 115 358 115 341V183Z" fill="#ffffff" fillOpacity="0.95"/>
+            <rect x="158" y="239" width="196" height="19" rx="9.5" fill="#c9a961"/>
+            <rect x="158" y="277" width="128" height="19" rx="9.5" fill="#c9a961" fillOpacity="0.65"/>
+            <rect x="158" y="315" width="158" height="19" rx="9.5" fill="#c9a961" fillOpacity="0.35"/>
+          </svg>
         </div>
         <span className="text-base font-semibold">Filer</span>
       </div>
